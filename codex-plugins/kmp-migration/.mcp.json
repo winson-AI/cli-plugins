@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "kmp-validator": {
-      "command": "node",
-      "args": ["dist/index.js"]
-    }
-  }
-}
