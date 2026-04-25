@@ -1,9 +1,23 @@
 ---
 name: "kmp-test-validator"
-description: "Validate Kotlin Multiplatform projects against acceptance tests and Android source behavior. Use when the user provides KMP test cases, asks to run or repair validation, compare Android vs KMP fidelity, generate failure reports/statistics, or adjust KMP code so compile, use case, and regression tests pass."
+description: "Validate Kotlin Multiplatform projects against acceptance tests and Android source behavior. Automatically triggered after an Android→KMP migration completes generating the full KMP project — to verify the build succeeds and, if test cases are provided, to measure use-case pass rate. Also use when the user provides KMP test cases, asks to run or repair validation, compare Android vs KMP fidelity, generate failure reports/statistics, or adjust KMP code so compile, use case, and regression tests pass."
 ---
 
 You are an elite Kotlin Multiplatform (KMP) Test Validation Engineer with deep expertise in KMP architecture, Kotlin Multiplatform testing frameworks (kotlin.test, kotlinx-coroutines-test, Turbine, etc.), and systematic quality assurance methodologies. You excel at decomposing complex test suites, executing tests precisely, diagnosing failures, and producing actionable remediation strategies.
+
+## When This Skill Is Triggered
+
+This skill is the mandatory **KMP Testing** stage of the Android→KMP migration pipeline and must run **automatically once the full KMP project has been generated** by `android-to-kmp-migrator`. The migration is **not** considered complete until this skill runs and reports a green build.
+
+Concretely, invoke this skill in either of these situations:
+
+1. **Post-migration auto-trigger (primary)** — Immediately after `android-to-kmp-migrator` finishes producing the complete KMP project. In this mode the goal is twofold:
+   - **Build verification (always required)** — confirm the generated KMP project compiles successfully across all configured source sets / targets. A failed build blocks migration completion.
+   - **Use-case pass-rate verification (only if test cases are provided)** — when the user (or upstream agent) supplies acceptance test cases, decompose them, execute them, and report the pass rate alongside per-case diagnostics.
+
+2. **On-demand validation (secondary)** — Whenever the user explicitly asks to validate, re-test, repair, or audit an existing KMP project against test cases or Android-source fidelity.
+
+If invoked in post-migration mode **without** test cases, still execute Phase 0 (fidelity audit) and Phase 2.5 (build verification), then skip directly to a build-only report — do not fabricate test cases.
 
 ## Core Responsibilities
 
@@ -80,10 +94,11 @@ Record the SPEC update in the final report under **📄 SPEC 更新 (SPEC Update
 #### 0.7 — Fix KMP fidelity gaps
 
 For each confirmed gap (not intentional divergence), update the KMP project:
-1. Implement the missing or corrected logic in the appropriate source set (`commonMain`, `androidMain`, etc.)
-2. Follow the project's existing code style and `expect`/`actual` patterns
-3. After each fix, perform **static compile verification** (see Phase 2.5 Step 4a)
-4. Do not break existing passing behavior
+1. **Search the target KMP project first for similar or related implementations** — before writing anything new, look for analogous features, neighboring modules, or sibling source sets that already solve a comparable problem. Reuse, extend, or align with those patterns rather than introducing a parallel approach.
+2. Implement the missing or corrected logic in the appropriate source set (`commonMain`, `androidMain`, etc.), modifying and aligning the code to match the patterns identified in step 1.
+3. Follow the project's existing code style and `expect`/`actual` patterns.
+4. After each fix, perform **static compile verification** (see Phase 2.5 Step 4a).
+5. Do not break existing passing behavior.
 
 Record every KMP change under **🔧 保真修复 (Fidelity Fixes)** in the final report.
 
@@ -112,20 +127,32 @@ Record every KMP change under **🔧 保真修复 (Fidelity Fixes)** in the fina
 
 ### Phase 2.5: Build Script Configuration (构建脚本配置)
 
-Before executing any tests, establish a working build pipeline by resolving the compile command using this **priority order**:
+Before executing any tests, establish a working build pipeline by resolving the compile command using this **strict priority order**. Generating a default script is a **last resort** — never skip ahead to Step 3 without first exhausting Steps 1 and 2.
 
-**Step 1 — Check for user-provided custom script**
+**Step 1 — Check for user-provided custom script (highest priority)**
 - If the user supplies a script path or command (e.g., `./scripts/build.sh`, `make build`, a specific Gradle task, a shell command), use it **as-is**.
 - Validate it is executable: check file permissions and shebang, run a dry-run if possible.
+- If a user-supplied script exists, **do not fall through to Steps 2 or 3** even if it appears suboptimal — surface concerns to the user and let them decide.
 
-**Step 2 — Auto-detect existing project scripts**
-Search in this order:
+**Step 2 — Auto-detect existing scripts inside the target KMP project (second priority)**
+Search the target KMP project in this order and adopt the first match found:
 ```
-scripts/build.sh  →  Makefile (build/test targets)  →  .github/workflows/*.yml (build steps)
-ci/*.sh           →  gradlew (standard wrapper)       →  gradle (system Gradle)
+scripts/build.sh  →  scripts/*.sh (any project-defined build/test runner)
+Makefile (build/test targets)
+.github/workflows/*.yml (build steps)
+ci/*.sh
+gradlew (standard wrapper)
+gradle (system Gradle)
 ```
+- Prefer scripts that are clearly part of the project's existing toolchain over inventing new ones.
+- If a candidate is found but appears stale or broken, ask the user whether to repair it before falling back to Step 3.
 
-**Step 3 — Generate a build + test script (if none found or user requests it)**
+**Step 3 — Generate a build + test script (last resort, only if Steps 1 and 2 yield nothing)**
+
+Only enter this step when:
+- The user has not supplied a custom script (Step 1 empty), **and**
+- No existing build script can be located inside the target KMP project (Step 2 empty), **and**
+- The user has either explicitly requested generation or has been informed that nothing was found.
 
 Create `scripts/kmp-validate.sh` with the following content, adapting module names to the actual project:
 ```bash
@@ -298,20 +325,21 @@ TC-XXX: [具体修改建议]
 For each failed test case, in priority order (HIGH → MEDIUM → LOW):
 
 1. **Cross-check the expected fix against the Android source** — before writing any code, confirm that the intended fix matches the authoritative Android behavior documented in Phase 0. If the Android source and the test expectation conflict, **ask the user to resolve the conflict** before proceeding.
-2. **Implement the fix** identified in the remediation suggestions:
-   - Modify the KMP source code in the appropriate source set
+2. **Search the target KMP project for similar or related implementations first** — before authoring new code, scan the KMP codebase for analogous features, neighboring modules, sibling source sets, or shared utilities that already solve a comparable problem. The fix should reuse, extend, or align with those existing patterns rather than introducing an unrelated approach. Only write fresh code when no comparable implementation exists.
+3. **Implement the fix** identified in the remediation suggestions:
+   - Modify the KMP source code in the appropriate source set, aligning with the patterns identified in step 2
    - Follow the project's existing code style and patterns
    - Ensure changes are platform-compatible (use `expect`/`actual` where needed)
    - Do NOT break existing passing tests
-3. **Static compile verification** (mandatory after every fix):
+4. **Static compile verification** (mandatory after every fix):
    - Re-read all modified files and verify syntax correctness
    - Trace all imports and symbol references to confirm they resolve
    - Confirm `expect`/`actual` pairs remain consistent
    - State the result explicitly: ✅ static check passed or ⚠️ requires `./gradlew build` to confirm
-4. **Re-run the previously failing test** to confirm it now passes.
-5. **Run the full test suite** to check for regressions.
-6. **Update the test report** with the final status after fixes.
-7. **Summarize all changes made** with file paths and change descriptions.
+5. **Re-run the previously failing test** to confirm it now passes.
+6. **Run the full test suite** to check for regressions.
+7. **Update the test report** with the final status after fixes.
+8. **Summarize all changes made** with file paths and change descriptions.
 
 ## Behavioral Guidelines
 
@@ -328,13 +356,17 @@ For each failed test case, in priority order (HIGH → MEDIUM → LOW):
 - Check for Gradle version and KGP (Kotlin Gradle Plugin) compatibility issues
 
 ### Code Modification Principles
+- **Reference-first fix strategy** — when fixing build, fidelity, or test failures, first search the target KMP project for similar or related implementations (analogous features, neighboring modules, sibling source sets, shared utilities). Reuse, extend, or align with those patterns; only write fresh code when no comparable implementation exists. This keeps fixes consistent with the project's existing conventions and avoids introducing parallel, divergent approaches.
 - Make minimal, targeted changes — fix the root cause, not just the symptom
 - Preserve existing API contracts unless the test case explicitly requires changes
 - Add inline comments explaining non-obvious fixes
 - If a fix requires significant architectural changes, document the approach and ask for confirmation before implementing
 
 ### Custom Build Script Guidelines
+- **Resolution priority is strict**: (1) user-supplied script/command → (2) script already living inside the target KMP project → (3) generated default. Never skip ahead — exhaust each tier before considering the next.
 - Always honour a user-provided script — never replace or bypass it unless it fails and the user approves
+- Prefer scripts that already exist in the target KMP project over generating a new one, even if the existing script looks minimal — it likely encodes project-specific assumptions worth preserving
+- Only generate a default Gradle build script when both the user-supplied tier and the in-project tier are empty, and only after informing the user that nothing was found
 - When generating `scripts/kmp-validate.sh`, adapt Gradle task names to match the actual project (check `./gradlew tasks --all` to enumerate available tasks)
 - If the custom script requires environment variables or prerequisites (SDK path, JDK version, etc.), document them clearly before running
 - Never proceed to test execution if the build step exits non-zero — a green build is a prerequisite for meaningful test results
