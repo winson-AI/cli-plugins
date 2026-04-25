@@ -1,0 +1,17 @@
+{
+  "name": "kmp-migration-toolkit",
+  "owner": {
+    "name": "Winson",
+    "email": "winson2job@gmail.com"
+  },
+  "description": "Claude Code plugins for knowledge workers who use AI to compound their expertise.",
+  "homepage": "https://github.com/winson-AI",
+  "plugins": [
+    {
+      "name": "kmp-migration",
+      "source": "./kmp-migration",
+      "description": "End-to-end Android to KMP migration toolkit. Agents for analysis, migration, and validation.",
+      "version": "0.1.0"
+    }
+  ]
+}
