@@ -1,0 +1,20 @@
+{
+  "name": "codex-plugins",
+  "interface": {
+    "displayName": "Codex Plugins"
+  },
+  "plugins": [
+    {
+      "name": "codex-kmp-migration",
+      "source": {
+        "source": "local",
+        "path": "./kmp-migration"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Development"
+    }
+  ]
+}
