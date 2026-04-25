@@ -39,7 +39,8 @@ codex -> /plugins switch to market and install
 
 # Gemini CLI
 cd ../gemini-extensions/kmp-migration
-gemini plugin marketplace add .
+gemini extensions install .
+gemini extensions list
 ```
 
 General form:
