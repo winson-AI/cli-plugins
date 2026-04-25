@@ -1,0 +1,11 @@
+{
+  "name": "kmp-migration",
+  "version": "0.1.0",
+  "contextFileName": "GEMINI.md",
+  "mcpServers": {
+    "kmp-validator": {
+      "command": "node",
+      "args": ["${extensionPath}${/}index.js"]
+    }
+  }
+}
