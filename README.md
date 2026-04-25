@@ -4,15 +4,15 @@ A collection of specialized, high-performance plugins and agents designed for AI
 
 ## 🚀 Key Features
 
-- **Cross-CLI Support**: Standardized markdown-based agent definitions that work seamlessly across different AI environments.
-- **Zero-Install Principle**: Designed to be portable and dependency-free, allowing for instant usage.
+- **Cross-CLI Support**: Standardized structures for Claude Code, Gemini extensions, and Codex plugins.
+- **Zero-Install Principle**: Designed to be portable and dependency-free.
 - **High Fidelity**: Specialized agents for complex workflows like Android-to-KMP migration.
 
-## 📦 Available Plugins
+## 📦 Available Plugins & Extensions
 
-| Plugin | Description | Supported CLIs |
-|--------|-------------|----------------|
-| **[kmp-migration](claude-code-plugins/kmp-migration/)** | A complete toolkit for migrating Android projects to Kotlin Multiplatform (KMP). Includes analysis, migration, and validation agents. | Claude Code, Gemini, Codex |
+| Plugin | Description | Supported Platforms |
+|--------|-------------|---------------------|
+| **[kmp-migration](claude-code-plugins/kmp-migration/)** | Toolkit for Android-to-KMP migration (Analysis, Migration, Validation). | Claude Code, Gemini, Codex |
 
 ---
 
@@ -29,15 +29,15 @@ This repository follows the Claude Code plugin marketplace structure.
 ```
 
 ### 2. Gemini CLI
-To utilize these specialized agents in Gemini:
-1. Locate the agent definitions in `claude-code-plugins/kmp-migration/agents/`.
-2. Reference or import these `.md` files into your Gemini project configuration.
-3. Invoke directly: `invoke_agent("android-to-kmp-migrator", "Convert this module")`.
+To use these agents within the Gemini CLI environment:
+1. Copy the relevant plugin folder from `gemini-extensions/` to your local extensions directory.
+2. Link the extension for testing: `gemini extensions link .`
+3. Invoke agents directly: `invoke_agent("android-to-kmp-migrator", "Convert this module")`.
 
-### 3. Codex & Open Source Repos
-For Codex or custom implementations:
-- Point your agent configuration to the `agents/` directory of the desired plugin.
-- The YAML frontmatter in each `.md` file defines the tools, model, and triggers required for the agent to operate.
+### 3. Codex
+For Codex integration:
+- Point your Codex configuration to the `codex-plugins/` directory.
+- The manifest (`plugin.json`) and skill definitions will be automatically detected.
 
 ---
 
@@ -45,20 +45,16 @@ For Codex or custom implementations:
 
 ```
 cli-plugins/
-├── claude-code-plugins/          # Central directory for all plugin packages
-│   ├── .claude-plugin/           # Marketplace registry
-│   └── kmp-migration/            # KMP Migration Toolkit
-│       ├── agents/               # Multi-platform agent definitions (.md)
-│       ├── skills/               # Automated capabilities
-│       ├── commands/             # Slash commands
-│       └── README.md             # Plugin documentation
-├── CONTRIBUTING.md               # How to contribute new plugins or agents
-└── README.md                     # This file
+├── claude-code-plugins/    # Plugins for Claude Code
+├── gemini-extensions/      # Extensions for Gemini CLI
+├── codex-plugins/          # Plugins for Codex
+├── CONTRIBUTING.md         # Guidelines for contributions
+└── README.md               # This file
 ```
 
 ## 🤝 Contributing
 
-We welcome contributions of new plugins or improvements to existing agents. Please refer to [CONTRIBUTING.md](claude-code-plugins/CONTRIBUTING.md) for detailed guidelines on the plugin structure and design principles.
+We welcome contributions. Please refer to [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines on the project structure and design principles.
 
 ## 📄 License
 
