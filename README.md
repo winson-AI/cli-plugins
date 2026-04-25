@@ -35,6 +35,7 @@ claude plugin marketplace add .
 # Codex
 cd ../codex-plugins
 codex plugin marketplace add .
+codex -> /plugins switch to market and install
 
 # Gemini CLI
 cd ../gemini-extensions/kmp-migration
