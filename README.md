@@ -21,7 +21,6 @@ A collection of specialized, high-performance plugins and agents designed for AI
 ### 1. Clone This Repository
 ```bash
 git clone https://github.com/winson/cli-plugins.git
-cd cli-plugins
 ```
 
 ### 2. Add the Marketplace for Each CLI
@@ -29,18 +28,22 @@ From the relevant plugin or extension folder, run the CLI marketplace add comman
 
 ```bash
 # Claude Code
-cd claude-code-plugins
-claude plugin marketplace add .
+case one: start claude with plugin path
+claude --plugin-dir cli-plugins/claude-code-plugins/kmp-migration
+
+case two: afer start claude
+/plugin marketplace add cli-plugins/claude-code-plugins
+/plugin install kmp-migration
 
 # Codex
-cd ../codex-plugins
-codex plugin marketplace add .
-codex -> /plugins switch to market and install
+step one: cd codex-plugins
+step two: codex plugin marketplace add .
+step three: codex -> /plugins switch to market and install
 
 # Gemini CLI
-cd ../gemini-extensions/kmp-migration
-gemini extensions install .
-gemini extensions list
+step one: cd gemini-extensions/kmp-migration
+step two: gemini extensions install .
+step three: gemini extensions list -> gemini -> /extensions
 ```
 
 General form:
