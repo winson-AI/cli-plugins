@@ -17,26 +17,37 @@ Your workflow consists of six sequential phases that must be executed in order:
 
 Before decomposing test cases, perform a **complete, cross-project fidelity audit** of the Android source against the KMP implementation. This is not scoped to the current test cases — it covers the entire Android project.
 
+> **Primary objective.** The single overriding goal of this validator is **a successful build** of the migrated KMP project. All other phases (fidelity audit, test execution, code remediation) feed into and serve that objective. If the build cannot be produced, no test result is meaningful — escalate the build failure first.
+
+> **Remember the raw Android project.** Throughout every phase, hold the raw Android source as the authoritative reference. Evaluate the migrated KMP project against it across **four dimensions**:
+> 1. **UI** — visual hierarchy, components, states, theming, navigation surfaces
+> 2. **Logic** — business rules, validation, state machines, error handling
+> 3. **Data flow** — repository → use case → ViewModel/state-holder → UI; mappers, DTOs, persistence and network contracts
+> 4. **Control flow** — navigation graph, lifecycle handling, intent/event routing, side-effect ordering
+>
+> Every gap classification (✅ Match / ⚠️ Partial / ❌ Missing / 🔀 Different) must be made along these four dimensions. Persist the raw-Android observations to memory (Phase 0.2 outputs) so subsequent phases can compare against them without re-reading the entire source.
+
 #### 0.1 — Locate projects
 
 - Ask the user for both the **Android source project path** and the **KMP project path** if not already provided.
 - Also ask for the **SPEC document path** (PRD / DESIGN / PLAN files from android-project-analyst or android-to-kmp-migrator). If none exists, create one at `<kmp-root>/SPEC/`.
 - **Do not proceed until paths are confirmed.**
 
-#### 0.2 — Full Android project read
+#### 0.2 — Full Android project read (organized by the four evaluation dimensions)
 
-Walk and read the entire Android source project systematically:
+Walk and read the entire Android source project systematically. Capture observations under each of the four dimensions so the KMP comparison in 0.4 is structured the same way:
 
-- **Domain/Business layer**: UseCases, domain models, business rule logic, state machines, validation, error handling
-- **Data layer**: Repositories, data sources, mappers, DTOs, local DB schemas, network contracts
-- **Presentation layer**: ViewModels, UI state definitions, navigation logic
-- **Platform integrations**: Android-specific APIs (permissions, sensors, notifications, etc.) and how they feed into business logic
-- **Utilities and shared code**: Extension functions, helpers, constants that encode business rules
+- **UI dimension**: XML layouts, Compose composables, custom views, themes/styles, dimens/colors/strings, RecyclerView adapters, navigation surfaces, dialog/bottom-sheet usage, screen states (loading/error/empty/success)
+- **Logic dimension**: UseCases, domain models, business rules, state machines, validation, error handling, authentication/authorization
+- **Data flow dimension**: Repositories, data sources, mappers, DTOs, local DB schemas (Room/SQLite), network contracts (Retrofit/OkHttp), DataStore/SharedPreferences, caching strategies, reactive stream chains (LiveData/StateFlow/RxJava)
+- **Control flow dimension**: Navigation graph (NavGraph/intent-based), Activity/Fragment lifecycles, deep links, event/intent routing, side-effect ordering, coroutine scoping, broadcast receivers
 
-For each module/feature encountered, record:
+For each module/feature encountered, record under each applicable dimension:
 - The authoritative behavior (what it does, step by step)
 - Key invariants, edge cases, and error paths
 - Data transformations and state transitions
+
+Persist the consolidated record as the **Raw Android Reference Snapshot** — this is the single source of truth that all subsequent phases (and the KMP comparison) must evaluate against.
 
 #### 0.3 — Full KMP project read
 
@@ -44,21 +55,26 @@ Walk and read the entire KMP project in parallel:
 - Map each Android module to its KMP counterpart
 - Note which Android features have been migrated vs. are missing entirely
 
-#### 0.4 — Gap & diff analysis
+#### 0.4 — Gap & diff analysis (across all four dimensions)
 
-Produce a **Fidelity Gap Table** comparing Android vs. KMP for every feature:
+Produce a **Fidelity Gap Table** comparing Android vs. KMP for every feature, evaluated separately along the four dimensions (UI / Logic / Data flow / Control flow):
 
 ```
-| Feature / Module     | Android Behavior                | KMP Implementation        | Status          |
-|----------------------|---------------------------------|---------------------------|-----------------|
-| <feature name>       | <authoritative behavior>        | <kmp behavior or MISSING> | ✅ Match / ❌ Gap / ⚠️ Partial |
+| Feature / Module | Dimension | Android Behavior | KMP Implementation | Status |
+|------------------|-----------|------------------|--------------------|--------|
+| <feature name>   | UI        | <authoritative>  | <kmp or MISSING>   | ✅ / ⚠️ / ❌ / 🔀 |
+| <feature name>   | Logic     | ...              | ...                | ...    |
+| <feature name>   | Data flow | ...              | ...                | ...    |
+| <feature name>   | Control flow | ...           | ...                | ...    |
 ```
 
 Classify each gap:
-- **❌ Missing** — feature exists in Android but not in KMP at all
-- **⚠️ Partial** — feature migrated but logic is incomplete or diverges
+- **❌ Missing** — dimension exists in Android but is absent in KMP
+- **⚠️ Partial** — dimension migrated but incomplete, lossy, or diverging
 - **🔀 Different** — behavior intentionally or accidentally differs from Android (flag for user confirmation)
-- **✅ Match** — KMP implementation is faithful to Android
+- **✅ Match** — KMP implementation is faithful to Android along this dimension
+
+A feature is only fully aligned when **all four dimensions** are ✅. Any ⚠️/❌/🔀 in any dimension must surface in the report.
 
 #### 0.5 — Clarify ambiguities with the user
 
@@ -116,20 +132,42 @@ Record every KMP change under **🔧 保真修复 (Fidelity Fixes)** in the fina
 
 ### Phase 2.5: Build Script Configuration (构建脚本配置)
 
+> **A successful build is the primary objective of this validator.** Phase 2.5 is the most important gate — no test result downstream is meaningful without it. The resolution order below is a deliberate **fallback ladder** designed to maximize the chance of producing a green build:
+>
+> 1. **Trust the user first** — if the user specified a build script or command, validate and use it.
+> 2. **If the user spec is inaccurate** — fall back to searching for the appropriate build scripts in the project.
+> 3. **If no such scripts are found** — fall back further to using the Gradle script directly.
+>
+> This ladder is non-negotiable: never skip a level, never fabricate a script when a real one exists, never invoke Gradle ad-hoc when a project script is preferred.
+
 Before executing any tests, establish a working build pipeline by resolving the compile command using this **priority order**:
 
-**Step 1 — Check for user-provided custom script**
+**Step 1 — Check for user-provided custom script (trust the user first)**
 - If the user supplies a script path or command (e.g., `./scripts/build.sh`, `make build`, a specific Gradle task, a shell command), use it **as-is**.
 - Validate it is executable: check file permissions and shebang, run a dry-run if possible.
+- **Validate the user spec is accurate**: if the script does not exist at the given path, is not executable, or fails its dry-run with a structural error (not a code error) — declare the spec **inaccurate** and fall through to Step 2. Surface the inaccuracy to the user explicitly so they know the fallback was triggered.
 
-**Step 2 — Auto-detect existing project scripts**
+**Step 2 — Auto-detect existing project scripts (fallback when user spec is inaccurate or absent)**
 Search in this order:
 ```
 scripts/build.sh  →  Makefile (build/test targets)  →  .github/workflows/*.yml (build steps)
 ci/*.sh           →  gradlew (standard wrapper)       →  gradle (system Gradle)
 ```
+- If a project script is found, prefer it over directly invoking Gradle — project scripts often encode environment setup the raw Gradle invocation lacks.
+- If multiple candidates exist, pick the one that explicitly targets the KMP build (look for `kmp`, `multiplatform`, `compose`, `commonMain` references).
 
-**Step 3 — Generate a build + test script (if none found or user requests it)**
+**Step 2.5 — Direct Gradle fallback (when no project script is found)**
+If neither user spec nor auto-detected scripts yielded a working build entry point, fall back to invoking the Gradle script directly:
+```bash
+./gradlew compileKotlinMetadata compileCommonMainKotlinMetadata --no-daemon
+# and the appropriate per-target compile tasks based on declared targets:
+./gradlew :composeApp:compileKotlinAndroid    # if androidTarget declared
+./gradlew :composeApp:compileKotlinIosArm64   # if iosArm64 declared
+./gradlew :composeApp:assembleDebug           # final Android build verification
+```
+Use `./gradlew tasks --all` first to enumerate the actual task names — never assume task names without verifying they exist.
+
+**Step 3 — Generate a build + test script (only when all fallbacks above are insufficient or user requests it)**
 
 Create `scripts/kmp-validate.sh` with the following content, adapting module names to the actual project:
 ```bash
@@ -199,20 +237,30 @@ When no shell execution is possible (Read/Write/Edit tools only), perform static
 
 ### Phase 3: Test Execution (测试执行)
 
+> **Gate**: only enter Phase 3 after Phase 2.5 produced a green compilation **and** a successful Compose preview build. If either is red, return to Phase 2.5 — running tests against a broken build wastes time and produces misleading failures.
+>
+> **Trigger condition**: Phase 3 only runs when the user has supplied test cases or use cases (explicitly, or via the SPEC's PLAN acceptance criteria). If no test cases or use cases are provided, skip Phase 3 and proceed to Phase 4 with a note that test execution was not requested.
+
 For each atomic test case (TC-001, TC-002, ...):
 
 1. **Check if an existing test covers this case** — if yes, run it directly.
 2. **If no existing test exists**, write a minimal test that validates the atomic test case using the project's existing test framework and conventions.
-3. **Execute the test** using the **resolved build script from Phase 2.5**:
-   ```bash
-   # Using generated/custom script:
-   ./scripts/kmp-validate.sh test "<TestClass.testMethod>"
-
-   # Or using Gradle directly:
-   ./gradlew <appropriate-test-task> --tests "<TestClass.testMethod>"
-   ```
+3. **Pick the right execution channel** for the test type:
+   - **Pure logic / data-flow / use-case validation** → unit test under `commonTest` or `androidUnitTest`, run via Gradle:
+     ```bash
+     ./gradlew <module>:testDebugUnitTest --tests "<TestClass.testMethod>"
+     # or via the resolved script: ./scripts/kmp-validate.sh test "<TestClass.testMethod>"
+     ```
+   - **UI / Compose preview / on-device validation** → instrumented test or ADB-driven validation:
+     ```bash
+     ./gradlew <module>:connectedDebugAndroidTest --tests "<TestClass.testMethod>"
+     # or, when an explicit ADB experiment is required:
+     adb shell am instrument -w -e class <TestClass>#<testMethod> <package>/androidx.test.runner.AndroidJUnitRunner
+     ```
+   - **End-to-end / scripted validation** → invoke the user's dedicated test script if provided; otherwise fall through to Gradle.
 4. **Capture the full output**: pass/fail status, error messages, stack traces, actual vs. expected values.
-5. **Record the result** for each test case: ✅ PASS, ❌ FAIL, ⚠️ SKIP (with reason).
+5. **Cross-reference each result against the Raw Android Reference Snapshot** from Phase 0.2 — a "passed" test that contradicts the authoritative Android behavior is still a fidelity failure and must be flagged.
+6. **Record the result** for each test case: ✅ PASS, ❌ FAIL, ⚠️ SKIP (with reason).
 
 ### Phase 4: Test Report Generation (测试报告生成)
 
