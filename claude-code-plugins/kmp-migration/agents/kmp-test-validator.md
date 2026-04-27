@@ -217,6 +217,7 @@ Run the compile step using the resolved script:
   3. Apply a targeted fix to the source or build configuration.
   4. Re-run the build until it passes — **do not proceed to test execution with a broken build**.
   5. Document every build fix in the final report under a **🔨 构建修复 (Build Fixes)** section.
+  6. **If the build error is resource-related** (unresolved `R.*` / `Res.*`, missing drawable/string/font, `aapt` resource errors, Compose Resources generation errors), apply the **Resource Failure Protocol** in Behavioral Guidelines — review the original Android project, copy missing resources to the correct KMP location, and fix the references — before re-running the build.
 
 **Step 4a — Post-fix static compile verification (applies when shell is unavailable)**
 
@@ -259,8 +260,9 @@ For each atomic test case (TC-001, TC-002, ...):
      ```
    - **End-to-end / scripted validation** → invoke the user's dedicated test script if provided; otherwise fall through to Gradle.
 4. **Capture the full output**: pass/fail status, error messages, stack traces, actual vs. expected values.
-5. **Cross-reference each result against the Raw Android Reference Snapshot** from Phase 0.2 — a "passed" test that contradicts the authoritative Android behavior is still a fidelity failure and must be flagged.
-6. **Record the result** for each test case: ✅ PASS, ❌ FAIL, ⚠️ SKIP (with reason).
+5. **If the failure mentions resources** (drawable/string/color/dimen/font/asset/`R.*`/`Res.*`/`MissingResourceException`), invoke the **Resource Failure Protocol** in Behavioral Guidelines before any other remediation — go back to the original Android project, verify the resource is located, copied, and accurately referenced.
+6. **Cross-reference each result against the Raw Android Reference Snapshot** from Phase 0.2 — a "passed" test that contradicts the authoritative Android behavior is still a fidelity failure and must be flagged.
+7. **Record the result** for each test case: ✅ PASS, ❌ FAIL, ⚠️ SKIP (with reason).
 
 ### Phase 4: Test Report Generation (测试报告生成)
 
@@ -339,6 +341,15 @@ TC-XXX: [具体修改建议]
 • 修复项列表:
   - [file changed] → [what was fixed and why]
 
+🖼️ 资源修复 (Resource Fixes)
+─────────────────────────────────────────
+[Only present if resource-related errors were encountered and fixed via the Resource Failure Protocol]
+• 资源类别: [drawable / string / color / dimen / font / asset / ...]
+• Android 原始路径: [e.g. app/src/main/res/drawable-xxhdpi/ic_foo.png]
+• KMP 目标路径:    [e.g. composeApp/src/commonMain/composeResources/drawable/ic_foo.png]
+• 引用更新: [old reference → new reference, e.g. R.drawable.ic_foo → painterResource(Res.drawable.ic_foo)]
+• 限定符迁移: [density/locale/night-mode qualifiers preserved? ✅ / ⚠️ list any lost qualifier]
+
 📈 总体评估 (Overall Assessment)
 ─────────────────────────────────────────
 [Overall quality assessment and key findings, including fidelity confidence level]
@@ -384,6 +395,46 @@ For each failed test case, in priority order (HIGH → MEDIUM → LOW):
 - Preserve existing API contracts unless the test case explicitly requires changes
 - Add inline comments explaining non-obvious fixes
 - If a fix requires significant architectural changes, document the approach and ask for confirmation before implementing
+
+### Resource Failure Protocol (资源错误处理) — MANDATORY
+
+> **It is worth emphasizing**: whenever a build error, test failure, or runtime error is caused by resources (missing drawable, unresolved string/color/dimen, broken asset reference, missing font, unresolved `Res.drawable.*` / `Res.string.*` / `R.*` reference, `MissingResourceException`, image-not-found, etc.), you MUST go back to the **original Android project** and follow this checklist before applying any fix.
+
+Resource categories in scope:
+- Drawables (`res/drawable*/`, vector XMLs, PNG/JPG/WebP)
+- Strings, plurals, arrays (`res/values*/strings.xml`, etc.)
+- Colors, dimens, styles, themes (`res/values*/`)
+- Fonts (`res/font/`)
+- Raw assets (`res/raw/`, `assets/`)
+- Mipmaps / launcher icons
+- Animations and animators (`res/anim/`, `res/animator/`)
+- XML configs that the code loads as resources
+
+For every resource-related error, perform these three checks **in order** — do not skip:
+
+1. **Located in Android source?**
+   - Find the resource in the original Android project (search `app/src/main/res/**` and `assets/**`).
+   - Record its exact path, qualifier folders (e.g. `drawable-night-xxhdpi`, `values-zh-rCN`), and original filename.
+   - If the Android project itself does not contain it, surface this as a fidelity gap and ask the user — do not invent a placeholder.
+
+2. **Copied into the KMP project at the correct location?**
+   - Verify the resource exists under the KMP resources root for the relevant source set:
+     - Compose Multiplatform: `composeApp/src/commonMain/composeResources/{drawable,values,files,font,...}/` (or per-target source set when platform-specific)
+     - Android-only fallback: `composeApp/src/androidMain/res/...`
+   - Confirm filename casing matches (Compose Resources is case-sensitive and disallows hyphens in some categories — rename appropriately, e.g. `ic-foo.png` → `ic_foo.png`).
+   - Preserve the qualifier semantics: density buckets, locale variants, night-mode variants must be migrated using the Compose Multiplatform qualifier folder convention (e.g. `drawable-night/`, `values-zh/`).
+   - If the resource is missing in KMP, **copy it from the Android source** before changing any code.
+
+3. **Accurately referenced in KMP code?**
+   - Replace Android-style references (`R.drawable.foo`, `R.string.bar`, `context.getString(...)`) with the Compose Multiplatform equivalents:
+     - `painterResource(Res.drawable.foo)`
+     - `stringResource(Res.string.bar)`
+     - `Res.readBytes("files/...")` for raw bytes
+   - Confirm the import path matches the project's generated `Res` accessor (typically `<package>.generated.resources.Res` and `<package>.generated.resources.<id>`).
+   - If the generated `Res` accessor does not yet contain the new ID, trigger a Gradle resource generation (`./gradlew :composeApp:generateComposeResClass` or a clean rebuild) before re-running the test.
+   - Cross-check that the reference site matches the Android usage semantically (same drawable in same screen state, same string in same UI surface) — a wired-up but wrong resource is still a fidelity failure.
+
+Record every resource fix in the final report under a dedicated **🖼️ 资源修复 (Resource Fixes)** section, listing: original Android path → KMP destination path → reference site updated. If the resource issue cannot be resolved (e.g. proprietary asset missing from the Android source), escalate to the user with the exact Android path you searched.
 
 ### Custom Build Script Guidelines
 - Always honour a user-provided script — never replace or bypass it unless it fails and the user approves
