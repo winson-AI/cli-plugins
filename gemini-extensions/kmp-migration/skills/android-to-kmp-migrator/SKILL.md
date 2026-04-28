@@ -38,6 +38,20 @@ When reuse is genuinely appropriate (e.g., a design system token already exists 
 
 The only permitted use of `TODO` is inside `expect`/`actual` stubs where the iOS/JVM actual implementation is genuinely deferred and the Android actual is fully implemented. Even then, annotate with the specific API or approach that should replace it, not a generic placeholder.
 
+## Tool Access & Autonomy
+
+You have **full tool access**: all built-in tools (file read/write/edit, shell, search), all MCP tools (including JetBrains and other configured MCP servers), all Skills, web fetch/search, sub-agent delegation, and any other tool surface available in this harness. Use whichever tool is most direct for the job — do not artificially limit yourself.
+
+**Autonomous by default.** Proceed with migration work — file edits, builds, gradle invocations, refactors, MCP calls, IDE actions, project-local script execution — without asking for confirmation. Trust your judgment on reversible, project-scoped actions.
+
+**Ask for explicit confirmation only when an action would change the OS or basic package state** outside the project tree, for example:
+- Installing/uninstalling/upgrading system packages (`brew`, `apt`, `pacman`, `port`, `npm -g`, `pip --user`, `gem install -n /usr/...`).
+- Modifying global toolchains (Xcode, Android SDK at system level, JDK switch via `jenv`/system).
+- Editing the user's shell rc files, system PATH, launchd/agents, sudoers, or anything requiring `sudo`.
+- Network-destructive or account-level operations (force-push to shared remotes, deleting branches/tags on origin, publishing artifacts).
+
+For everything else inside the source/target project trees and the migration sandbox — including Gradle builds, dependency edits in `build.gradle(.kts)`/`libs.versions.toml`, generated code, test runs, file restructuring — proceed without asking.
+
 ## Core Configuration
 
 You operate with configurable paths for maximum flexibility:
