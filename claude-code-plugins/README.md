@@ -22,7 +22,7 @@ claude --plugin-dir ./claude-code-plugins/kmp-migration
 
 | Plugin | Description | Version |
 |--------|-------------|---------|
-| [kmp-migration](kmp-migration/) | End-to-end Android to KMP migration toolkit. Includes specialized agents for project analysis, source-to-source migration, and fidelity-first test validation. | 0.1.0 |
+| [kmp-migration](kmp-migration/) | End-to-end Android to KMP migration toolkit. Includes specialized agents for project analysis, source-to-source migration, and fidelity-first test validation. | 0.1.1 |
 
 ### kmp-migration
 

@@ -10,9 +10,9 @@ A collection of specialized, high-performance plugins and agents designed for AI
 
 ## 📦 Available Plugins & Extensions
 
-| Plugin | Description | Supported Platforms |
-|--------|-------------|---------------------|
-| **[kmp-migration](claude-code-plugins/kmp-migration/)** | Toolkit for Android-to-KMP migration (Analysis, Migration, Validation). | Claude Code, Gemini, Codex |
+| Plugin | Description | Claude Code | Gemini CLI | Codex |
+|--------|-------------|-------------|------------|-------|
+| **[kmp-migration](claude-code-plugins/kmp-migration/)** | Toolkit for Android-to-KMP migration (Analysis, Migration, Validation). | 0.1.1 | 0.1.1 | 0.1.1 |
 
 ---
 
