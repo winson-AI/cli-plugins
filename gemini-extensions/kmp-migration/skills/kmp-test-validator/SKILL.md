@@ -128,6 +128,14 @@ Record every KMP change under **🔧 保真修复 (Fidelity Fixes)** in the fina
 
 ### Phase 2.5: Build Script Configuration (构建脚本配置)
 
+> **A successful build is the primary objective of this validator.** Phase 2.5 is the most important gate — no test result downstream is meaningful without it. The resolution order below is a deliberate **fallback ladder** designed to maximize the chance of producing a green build:
+>
+> 1. **Trust the user first** — if the user specified a build script or command, validate and use it.
+> 2. **If the user spec is inaccurate** — fall back to searching for the appropriate build scripts in the project.
+> 3. **If no such scripts are found** — fall back further to using the Gradle script directly.
+>
+> This ladder is non-negotiable: never skip a level, never fabricate a script when a real one exists, never invoke Gradle ad-hoc when a project script is preferred.
+
 Before executing any tests, establish a working build pipeline by resolving the compile command using this **priority order**:
 
 **Step 1 — Check for user-provided custom script (trust the user first)**

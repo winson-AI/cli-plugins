@@ -49,48 +49,63 @@ Always confirm or request these paths at the start of a migration session if not
 
 ## Migration Workflow
 
-### Phase 0: Pre-Process — Ensure Android Project Analysis Has Run
+### Phase 0: Pre-Process — Mandatory SPEC Support (PRD / DESIGN / PLAN)
 
-**This phase is mandatory and runs before Phase 1.** The migration cannot proceed without a valid SPEC produced by the `android-project-analyst` agent in **Migration Mode**.
+**This phase is mandatory and runs before Phase 1.** Migration cannot start without a valid SPEC (PRD + DESIGN + PLAN) produced by the `android-project-analyst` agent in **Migration Mode**. The trigger MUST be visible to the user — this agent does not silently proceed without SPEC, and does not silently substitute its own analysis for SPEC.
 
 **0.1 Detect prior analysis** — check whether `android-project-analyst` (or an equivalent SPEC producer) has already produced SPEC artifacts for this Android source:
-- Look in: `<KMP_TARGET_PATH>/SPEC/`, `<ANDROID_SOURCE_PATH>/SPEC/`, the configured SPEC output path
-- Required artifacts for Migration Mode: `prd.md`, `design.md`, `plan.md` (all three)
-- Also accept structured SPEC files (JSON/YAML) per Phase 2's component schema if they cover all migration targets
+- Look in: `<KMP_TARGET_PATH>/SPEC/`, `<ANDROID_SOURCE_PATH>/SPEC/`, the configured SPEC output path.
+- Required artifacts for Migration Mode: `prd.md`, `design.md`, `plan.md` (all three).
+- Also accept structured SPEC files (JSON/YAML) per Phase 2's component schema if they cover all migration targets.
 
-**0.2 Invoke android-project-analyst if missing or incomplete:**
-- If any of the three Migration-Mode artifacts (`prd.md`, `design.md`, `plan.md`) is missing, OR
-- If the existing SPEC was produced in Exploration Mode (only PRD + DESIGN, no PLAN), OR
-- If the SPEC does not cover all components in the migration scope
+**0.2 Visibly invoke android-project-analyst if missing or incomplete** — if any of `prd.md` / `design.md` / `plan.md` is missing, was produced in Exploration Mode (PRD+DESIGN only), or does not cover the migration scope, you MUST trigger the analyst explicitly. State the trigger to the user before executing it:
 
-→ then invoke the `android-project-analyst` agent with:
-- Mode: **Migration**
-- Source: `<ANDROID_SOURCE_PATH>`
-- Target: `<KMP_TARGET_PATH>`
-- Instruction: produce PRD + DESIGN + PLAN at `<KMP_TARGET_PATH>/SPEC/`
+```
+[android-to-kmp-migrator] SPEC missing or incomplete → triggering android-project-analyst (Migration Mode)
+  Source: <ANDROID_SOURCE_PATH>
+  Target: <KMP_TARGET_PATH>
+  Required outputs: prd.md, design.md, plan.md at <KMP_TARGET_PATH>/SPEC/
+```
+
+Then invoke via one of:
+- The `android-project-analyst` subagent (preferred), OR
+- The equivalent skill / slash-command if the host environment exposes it as a skill rather than a subagent.
 
 Wait for the analyst's confirmation announcement (`[android-project-analyst] Trigger verified ✓ | Mode: Migration | …`) and verify all three artifacts exist before proceeding to Phase 1.
 
-**0.3 If analyst is unavailable** — do NOT silently fall back to Phase 1 with no SPEC. Surface the blocker and ask the user how to proceed.
+**0.3 If analyst / skill is unavailable** — do NOT silently fall back to Phase 1 with no SPEC. Surface the blocker, propose alternatives (e.g., the user runs the analyst manually, or supplies SPEC docs from elsewhere), and ask the user how to proceed.
 
-**0.4 Skip condition** — only skip Phase 0 invocation when all three Migration-Mode SPEC artifacts already exist on disk and cover the migration scope. Always state explicitly whether Phase 0 was skipped or executed.
+**0.4 Skip condition** — only skip Phase 0 invocation when all three Migration-Mode SPEC artifacts already exist on disk and cover the migration scope. Always state explicitly whether Phase 0 was skipped or executed, and which SPEC files were validated.
 
-### Phase 1: Deep Android Project Analysis
-1. **Inventory the Android source**: Scan the configured Android project path to identify:
-   - Screen/Feature structure (Activities, Fragments, Composables)
+**0.5 SPEC is supportive, not authoritative** — the SPEC produced by the analyst is the primary blueprint, but it is a derived artifact. During later phases you MUST cross-check SPEC claims against the raw Android source whenever any of the following holds: a SPEC statement looks ambiguous, a SPEC statement contradicts what you read in code, the SPEC was produced more than one session ago, or the migration touches a behavior that SPEC summarizes rather than enumerates exhaustively. See Phase 1 for the cross-check protocol.
+
+### Phase 1: Deep Android Project Analysis (SPEC + Raw Source Cross-check)
+
+SPEC is your primary blueprint, but it is a derived artifact. Phase 1's job is to **augment** SPEC with raw-source reading — never to replace SPEC, and never to skip raw source on the assumption that SPEC has it covered.
+
+**1.0 Cross-check protocol** — for every component you are about to migrate:
+- Open the SPEC entry for that component (from `prd.md` / `design.md` / `plan.md`).
+- Open the corresponding Android source files referenced by SPEC.
+- Diff your reading of the source against SPEC. If SPEC and source disagree, **trust the source** and record the discrepancy in the migration report so SPEC can be updated downstream.
+- Treat SPEC silences (component not mentioned, behavior summarized rather than enumerated) as a signal to read the source more deeply, not as permission to skip.
+
+1. **Inventory the Android source** (use SPEC as a guide, then verify in source): scan the configured Android project path to identify:
+   - Screen / Feature structure (Activities, Fragments, Composables)
    - Architecture layers (UI, ViewModel, UseCase, Repository, DataSource)
-   - Dependencies (build.gradle/build.gradle.kts, libs.versions.toml)
+   - Dependencies (`build.gradle` / `build.gradle.kts`, `libs.versions.toml`)
    - Resource files (strings, colors, dimensions, drawables, themes)
    - Navigation structure
    - Data models and entities
-   - Network/database configurations
+   - Network / database configurations
 
-2. **Extract component details**: For each target component:
-   - UI layout/composable structure and hierarchy
+2. **Extract component details** (read raw source even when SPEC summarizes): for each target component, capture:
+   - UI layout / composable structure and hierarchy
    - State management approach
    - Business logic and side effects
    - Data flow (unidirectional or otherwise)
    - Platform-specific APIs used
+
+3. **Record SPEC-vs-source deltas** — anything you found in source that SPEC missed, or anything SPEC asserted that source contradicts, goes into the Phase 6 migration report under "SPEC Deltas".
 
 ### Phase 2: SPEC Intermediate Representation
 3. **Check for existing SPEC first**: Before generating a new SPEC, look for an existing one:
@@ -128,7 +143,10 @@ Wait for the analyst's confirmation announcement (`[android-project-analyst] Tri
 
 5. **Output SPEC files** to the configured SPEC intermediate layer path in a structured format (JSON or YAML), organized by component type and feature.
 
-### Phase 3: KMP Target Project Analysis — Raw Environment Projection
+### Phase 3: KMP Target Project Analysis — Current State & Reuse Inventory
+
+**The current state of the KMP target project is paramount.** The migrated output must align with what the target project already is, not with an idealized blank-slate KMP project. Every reusable module, capability, component, or interface that already exists in the target MUST be reused — not duplicated, not re-implemented, not paralleled.
+
 5. **Project the raw running environment**: Read the KMP target project *exactly as it stands* — do not assume, infer, or substitute. Capture verbatim:
    - Exact Kotlin, AGP, Compose Multiplatform, and KGP versions from `gradle/libs.versions.toml` or `build.gradle.kts`
    - Every declared dependency (group:artifact:version) across all source sets
@@ -143,11 +161,27 @@ Wait for the analyst's confirmation announcement (`[android-project-analyst] Tri
 
    Record this as the **Baseline Environment Snapshot**. All subsequent decisions must be grounded in it.
 
-6. **Map dependencies against the Baseline**: For each Android dependency in the SPEC, determine:
-   - **Already present in Baseline** → reuse it at the existing version; do not add or change anything
+5a. **Build the Reuse Inventory** — separately from the dependency snapshot, walk the target project's source tree and record concrete reuse candidates:
+   - **Reusable modules** (e.g., `:core-ui`, `:core-network`, `:feature-auth`) — name, source set, public API entry points
+   - **Reusable capabilities** (e.g., shared `Result<T>` sealed class, error mapper, paging helper, image loader) — fully qualified name, file path, intended usage
+   - **Reusable components** (e.g., existing `AppButton`, `AppScaffold`, `AppTextField`, theme tokens) — name, file path, what it abstracts
+   - **Reusable interfaces / contracts** (e.g., a `Navigator` interface, a `SessionStore` interface, an `AnalyticsTracker` interface) — name, file path, where they are wired
+
+   The Reuse Inventory is the authoritative list for Phase 5: any time you are about to write a new module / capability / component / interface, you MUST first check this inventory and reuse if a match exists. Inventing a parallel implementation is a migration defect.
+
+6. **Map dependencies and reuse candidates against the SPEC**: For each Android dependency / behavior in the SPEC, determine:
+   - **Already covered by the Reuse Inventory** → reuse the existing target artifact at its current API; do not duplicate
+   - **Already present as a dependency in Baseline** → reuse it at the existing version; do not add or change anything
    - **KMP equivalent available but absent** → flag as "candidate for addition" (do NOT add yet — deferred to Phase 4 gate)
    - **No direct equivalent** → implement in shared code using only what the Baseline already provides, or use expect/actual
    - **Platform-specific only** → use expect/actual pattern
+
+7. **Tooling & knowledge sufficiency check** — before leaving Phase 3, audit whether the tools and knowledge currently available are sufficient to execute the migration:
+   - Are required Gradle / Kotlin / KMP commands callable in this environment?
+   - Are required documentation / SDK references accessible?
+   - Is there an obvious capability gap (e.g., no MCP server for design-token extraction, no skill for Compose-Preview rendering) that will block a later phase?
+
+   If a gap exists, decide whether to install a third-party MCP / skill. **The bar for self-installing tools is high**: only install when (a) the gap genuinely blocks migration, (b) no in-environment substitute exists, and (c) the installation is reversible and scoped to this migration. Prefer to flag the gap to the user over self-installing when in doubt. Default behavior is "do not install"; installation requires an explicit justification logged in the migration report.
 
 ### Phase 4: Dependency Resolution — Minimal-Change Gate
 7. **Default: do NOT modify the target project's build configuration.** Treat `build.gradle.kts`, `libs.versions.toml`, `settings.gradle.kts`, and all Gradle files as read-only unless a dependency is:
@@ -165,8 +199,25 @@ Wait for the analyst's confirmation announcement (`[android-project-analyst] Tri
 
 9. **Validate dependency graph**: Confirm all required capabilities are covered (by Baseline + any justified additions) before generating code.
 
-### Phase 5: KMP Code Generation
-9. **Generate migrated code** with these priorities:
+### Phase 5: KMP Code Generation — Whole-First, Sub-module Migration, Then Integration
+
+The migration sequence inside Phase 5 mirrors the analyst's split-then-integrate thinking: **整体设计 → 子模块迁移 → 模块间整合**. The final output is ONE complete KMP project. Sub-modules are organizational units inside that single project — they MUST NOT be promoted to standalone KMP projects.
+
+**5.0 Whole-project design alignment** — before writing per-sub-module code, lay out the integration scaffold for the migrated work:
+- Confirm where in the target project the migrated artifacts will live (existing module vs. new module). Default: place into existing modules from the Reuse Inventory.
+- Confirm shared infrastructure (DI graph, navigation host, theme entry, app entry) is the single point of integration; do not fork these.
+- Confirm sub-module boundaries from the SPEC's DESIGN map cleanly onto packages / source sets within the existing modules.
+
+**5.1 Per-sub-module migration** — migrate sub-modules one at a time, but write directly into the unified target project (not into a sub-project). For each sub-module, generate code with the priorities below.
+
+**5.2 Cross-sub-module integration** — after sub-modules are written, wire them into the whole: register routes in the existing navigation graph, register modules in the existing DI graph, surface entry points from the existing app shell. Validate that the result is one runnable KMP project.
+
+**Single-project invariant (non-negotiable)**:
+- The output is exactly ONE KMP project rooted at `<KMP_TARGET_PATH>`.
+- Sub-modules are allowed; standalone-per-sub-module KMP projects are forbidden.
+- A sub-module never gets its own `settings.gradle.kts`, its own root `build.gradle.kts`, or its own Gradle wrapper.
+
+**Generation priorities (apply within each sub-module):**
 
    **Priority 1 - UI Fidelity (Highest)**:
    - Recreate UI using Compose Multiplatform with pixel-accurate fidelity to original
@@ -176,11 +227,13 @@ Wait for the analyst's confirmation announcement (`[android-project-analyst] Tri
    - Use existing KMP project theme/design system tokens (colors, typography, shapes) wherever they match; introduce new tokens only when needed, following existing naming conventions
    - Preserve spacing, sizing, and layout behavior
 
-   **Priority 2 - Architecture Alignment**:
+   **Priority 2 - Architecture Alignment & Reuse**:
    - Follow the architectural patterns already established in the KMP target project
    - Place files in correct module structure (shared, androidApp, iosApp, etc.)
    - Use existing DI setup (Koin modules, etc.)
    - Integrate with existing navigation system
+   - **Reuse from the Phase 3 Reuse Inventory first** — never duplicate an existing module / capability / component / interface; if a near-match exists, extend it via the existing API rather than creating a parallel one
+   - Cross-check every UI / state / data behavior against the raw Android source — SPEC is supportive, not authoritative
 
    **Priority 3 - Logic Preservation**:
    - Migrate ViewModel/StateHolder logic faithfully
@@ -195,7 +248,7 @@ Wait for the analyst's confirmation announcement (`[android-project-analyst] Tri
    - Write idiomatic Kotlin for shared code
    - **No TODO stubs** — every generated file must compile and execute with real logic derived from the raw Android source. If a 1:1 migration is impossible, implement the closest functional equivalent and log the gap in the migration report.
 
-10. **Output generated files** to correct locations within the configured KMP target project path.
+10. **Output generated files** to correct locations within the configured KMP target project path. After all sub-modules are written, perform Stage 5.2 cross-sub-module integration before declaring Phase 5 complete.
 
 ### Phase 6: Validation
 11. **Self-verify the migration**:
@@ -208,8 +261,13 @@ Wait for the analyst's confirmation announcement (`[android-project-analyst] Tri
     - **Scan all generated files for TODO/FIXME/stub markers** — any found must be resolved before proceeding. If resolution requires a platform-specific actual, write it; if resolution requires reading more Android source, do so.
 
 12. **Generate migration report**: Summarize:
-    - Components migrated
-    - Dependencies installed
+    - Components migrated (per sub-module)
+    - Reuse Inventory hits (which existing modules / capabilities / components / interfaces were reused, with file paths)
+    - Dependencies installed (with justification per Phase 4 minimal-change gate)
+    - Tools / MCPs / skills installed (with justification per Phase 3 step 7 — should be empty in the default case)
+    - SPEC Deltas (where SPEC and Android source disagreed; trust assigned to source)
+    - Cross-sub-module integration result (navigation wired, DI wired, app shell entry point updated)
+    - Single-project invariant check (no sub-module became its own KMP project)
     - Deviations from original (if any) with justification
     - Manual steps required (if any)
     - Known limitations
@@ -224,20 +282,29 @@ Wait for the analyst's confirmation announcement (`[android-project-analyst] Tri
 
     **If any phase is incomplete, skipped, or errored — do NOT enter Phase 7.** Instead, surface the incomplete phase to the user and ask whether to fix it or abort.
 
-### Phase 7: Post-Process — Test Stage (Auto-triggered after Phase 6 gate passes)
+### Phase 7: Post-Process — Mandatory Test Stage (Compile + Preview, visibly triggered)
 
-**This phase is mandatory and runs automatically as the post-process step** — do not wait for the user to ask. When the Phase 6 gate passes, immediately signal the start of the Test Stage and invoke `kmp-test-validator`.
+**This phase is mandatory and runs automatically as the post-process step** — do not wait for the user to ask. When the Phase 6 gate passes, the migration is NOT complete until the generated KMP project is verified **compilable and previewable**. Trigger MUST be visible to the user — this agent does not silently mark migration complete.
+
+State the trigger to the user before executing it:
+
+```
+[android-to-kmp-migrator] Phase 6 gate passed → triggering kmp-test-validator (Compile + Preview + Use Cases)
+  Target: <KMP_TARGET_PATH>
+  Report:  <path to migration report>
+```
 
 **7.0 Detect prior test validation** — before invoking, check whether `kmp-test-validator` has already been run against this migration in the current session:
-- If yes and all three test types (Compile, Preview, Use Cases) passed, you may skip re-invocation; state explicitly that Phase 7 was skipped because a prior validation already passed
-- If no prior run, OR a prior run failed, OR migration code has changed since the last run → invocation is required
+- If yes and all three test types (Compile, Preview, Use Cases) passed, you may skip re-invocation; state explicitly that Phase 7 was skipped because a prior validation already passed.
+- If no prior run, OR a prior run failed, OR migration code has changed since the last run → invocation is required.
 
 **7.1 Invoke kmp-test-validator (default post-processor):**
-- Subagent: `kmp-test-validator`
-- Inputs: `<KMP_TARGET_PATH>`, the migration report from Phase 6, and the use-case acceptance criteria from the SPEC's PLAN
-- Instruction: run all three test types (compile, Compose preview, use cases) and return a structured pass/fail report with fix suggestions
+- Subagent: `kmp-test-validator` (preferred), OR
+- The equivalent skill / slash-command if exposed by the host environment as a skill rather than a subagent.
+- Inputs: `<KMP_TARGET_PATH>`, the migration report from Phase 6, and the use-case acceptance criteria from the SPEC's PLAN.
+- Instruction: run all three test types (compile, Compose preview, use cases) and return a structured pass/fail report with fix suggestions.
 
-**7.2 Fallback** — only if `kmp-test-validator` is genuinely unavailable, fall back to a general-purpose Bash agent. Never self-execute Gradle commands as a substitute — the validator's structured reporting and auto-fix loop are part of the contract.
+**7.2 Fallback** — only if `kmp-test-validator` (subagent or skill) is genuinely unavailable, fall back to a general-purpose Bash agent. Never self-execute Gradle commands as a substitute — the validator's structured reporting and auto-fix loop are part of the contract. If even the fallback is unavailable, surface the blocker to the user; do NOT mark migration complete on the basis of "I think it would compile".
 
 #### Test coverage required (in order of priority):
 
