@@ -1,97 +1,123 @@
 # Multi-CLI Plugins Ecosystem
 
-A collection of specialized, high-performance plugins and agents designed for AI-powered CLI environments. These tools are built to be cross-compatible, supporting **Claude Code**, **Gemini CLI**, **Codex**, and other open-source AI agent frameworks.
+A cross-CLI plugin repository for AI-powered development workflows. The current release focuses on Android-to-Kotlin Multiplatform (KMP) migration and provides matching distributions for Claude Code, Codex, and Gemini CLI.
 
-## 🚀 Key Features
+## Available Plugins and Extensions
 
-- **Cross-CLI Support**: Standardized structures for Claude Code, Gemini extensions, and Codex plugins.
-- **Zero-Install Principle**: Designed to be portable and dependency-free.
-- **High Fidelity**: Specialized agents for complex workflows like Android-to-KMP migration.
+| Toolkit | Description | Claude Code | Codex | Gemini CLI |
+|--------|-------------|-------------|-------|------------|
+| **[kmp-migration](claude-code-plugins/kmp-migration/)** | End-to-end Android-to-KMP migration workflow covering source analysis, runnable KMP generation, fidelity validation, and agent memory/skill maintenance for Claude Code. | 0.1.2 | 0.1.2 | 0.1.2 |
 
-## 📦 Available Plugins & Extensions
+## Current Agent and Skill Content
 
-| Plugin | Description | Claude Code | Gemini CLI | Codex |
-|--------|-------------|-------------|------------|-------|
-| **[kmp-migration](claude-code-plugins/kmp-migration/)** | Toolkit for Android-to-KMP migration (Analysis, Migration, Validation). | 0.1.1 | 0.1.1 | 0.1.1 |
+### Claude Code Agents
 
----
+The Claude Code plugin ships 5 specialized agents in `claude-code-plugins/kmp-migration/agents/`:
 
-## 🛠 Install Guidance
+| Agent | Purpose |
+|-------|---------|
+| `android-project-analyst` | Deep Android project analysis for architecture, XML/Compose UI, data/control flow, onboarding docs, and SPEC output (`PRD`, `DESIGN`, `PLAN`). |
+| `android-to-kmp-migrator` | Full or explicitly scoped Android-to-KMP migration that produces runnable KMP code with UI, business/data layers, navigation, theming, and mandatory validation. |
+| `kmp-test-validator` | KMP validation against test cases, acceptance criteria, and Android source behavior, including failure diagnosis, repair guidance, and reporting. |
+| `memory-curator` | Audits and optimizes agent memory stores, including retention/archive/delete recommendations and state recovery records. |
+| `skill-maintenance-advisor` | Periodically reviews conversation context and recommends creating or updating reusable skills. |
 
-### 1. Clone This Repository
+### Codex and Gemini Skills
+
+The Codex and Gemini distributions currently ship 3 KMP-focused skills:
+
+| Skill | Codex Path | Gemini Path |
+|-------|------------|-------------|
+| `android-project-analyst` | `codex-plugins/kmp-migration/skills/android-project-analyst/SKILL.md` | `gemini-extensions/kmp-migration/skills/android-project-analyst/SKILL.md` |
+| `android-to-kmp-migrator` | `codex-plugins/kmp-migration/skills/android-to-kmp-migrator/SKILL.md` | `gemini-extensions/kmp-migration/skills/android-to-kmp-migrator/SKILL.md` |
+| `kmp-test-validator` | `codex-plugins/kmp-migration/skills/kmp-test-validator/SKILL.md` | `gemini-extensions/kmp-migration/skills/kmp-test-validator/SKILL.md` |
+
+Claude Code also contains placeholder directories for future `commands/`, `skills/`, `hooks/`, and `templates/` content.
+
+## Install Guidance
+
+Clone the repository:
+
 ```bash
 git clone https://github.com/winson/cli-plugins.git
+cd cli-plugins
 ```
 
-### 2. Add the Marketplace for Each CLI
-From the relevant plugin or extension folder, run the CLI marketplace add command with the current directory (`.`).
+### Claude Code
+
+Load the plugin directly during development:
 
 ```bash
-# Claude Code
-case one: start claude with plugin path
-claude --plugin-dir cli-plugins/claude-code-plugins/kmp-migration
-
-case two: afer start claude
-/plugin marketplace add cli-plugins/claude-code-plugins
-/plugin install kmp-migration
-
-# Codex
-step one: cd codex-plugins
-step two: codex plugin marketplace add .
-step three: codex -> /plugins switch to market and install
-
-# Gemini CLI
-step one: cd gemini-extensions/kmp-migration
-step two: gemini extensions install .
-step three: gemini extensions list -> gemini -> /extensions
+claude --plugin-dir claude-code-plugins/kmp-migration
 ```
 
-General form:
+Or add the local marketplace after Claude Code starts:
 
 ```bash
-cli-name plugin marketplace add .
-```
-
-## 🛠 Usage Instructions
-
-### 1. Claude Code
-This repository follows the Claude Code plugin marketplace structure.
-```bash
-# Add the marketplace
-/plugin marketplace add https://github.com/winson/cli-plugins
-
-# Install the kmp-migration toolkit
+/plugin marketplace add claude-code-plugins
 /plugin install kmp-migration
 ```
 
-### 2. Gemini CLI
-To use these agents within the Gemini CLI environment:
-1. Copy the relevant plugin folder from `gemini-extensions/` to your local extensions directory.
-2. Link the extension for testing: `gemini extensions link .`
-3. Invoke agents directly: `invoke_agent("android-to-kmp-migrator", "Convert this module")`.
+### Codex
 
-### 3. Codex
-For Codex integration:
-- Point your Codex configuration to the `codex-plugins/` directory.
-- The manifest (`plugin.json`) and skill definitions will be automatically detected.
+Add the Codex marketplace from the `codex-plugins` directory, then install `codex-kmp-migration` from the plugin UI.
 
----
-
-## 📂 Project Structure
-
+```bash
+cd codex-plugins
+codex plugin marketplace add .
 ```
+
+### Gemini CLI
+
+Install the Gemini extension from its extension directory:
+
+```bash
+cd gemini-extensions/kmp-migration
+gemini extensions install .
+gemini extensions list
+```
+
+## Usage
+
+- Claude Code: invoke the agents by name or describe the Android/KMP task naturally.
+- Codex: install `codex-kmp-migration`; the three `SKILL.md` definitions are detected as skills.
+- Gemini CLI: install the extension; `GEMINI.md` and the bundled skills provide the migration context.
+
+Example tasks:
+
+```text
+Analyze this Android project and generate PRD, DESIGN, and PLAN specs.
+Migrate this Android feature module to Kotlin Multiplatform.
+Validate this KMP project against the Android source behavior and test cases.
+```
+
+## Versioning
+
+When changing plugin behavior, keep these versions aligned:
+
+- `claude-code-plugins/.claude-plugin/marketplace.json`
+- `claude-code-plugins/kmp-migration/.claude-plugin/plugin.json`
+- `codex-plugins/kmp-migration/.codex-plugin/plugin.json`
+- `gemini-extensions/kmp-migration/gemini-extension.json`
+- `gemini-extensions/kmp-migration/package.json`
+
+Current release: `0.1.2`.
+
+## Project Structure
+
+```text
 cli-plugins/
-├── claude-code-plugins/    # Plugins for Claude Code
-├── gemini-extensions/      # Extensions for Gemini CLI
-├── codex-plugins/          # Plugins for Codex
-├── CONTRIBUTING.md         # Guidelines for contributions
+├── claude-code-plugins/    # Claude Code marketplace and plugin
+├── codex-plugins/          # Codex marketplace and plugin
+├── gemini-extensions/      # Gemini CLI extension
+├── CONTRIBUTING.md         # Contribution guidelines
 └── README.md               # This file
 ```
 
-## 🤝 Contributing
+## Contributing
 
-We welcome contributions. Please refer to [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines on the project structure and design principles.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for project structure and contribution guidelines.
 
-## 📄 License
+## License
 
 MIT

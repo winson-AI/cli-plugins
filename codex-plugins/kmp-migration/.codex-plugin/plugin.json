@@ -1,6 +1,6 @@
 {
   "name": "codex-kmp-migration",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Codex toolkit for Android to KMP migration.",
   "author": "Winson",
   "homepage": "https://github.com/winson/cli-plugins",
